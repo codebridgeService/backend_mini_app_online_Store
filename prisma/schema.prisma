@@ -1,0 +1,281 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  SUPER_ADMIN
+  STORE_OWNER
+  MANAGER
+  STAFF
+  CUSTOMER
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+  REFUNDED
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
+
+enum PlanInterval {
+  MONTHLY
+  YEARLY
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  TRIALING
+  PAST_DUE
+  CANCELLED
+  EXPIRED
+}
+
+model Plan {
+  id            String      @id @default(auto()) @map("_id") @db.ObjectId
+  name          String
+  description   String?
+  priceMonthly  Float
+  priceYearly   Float
+  features      String[]
+  maxProducts   Int         @default(50)
+  maxOrders     Int         @default(500)
+  maxStaff      Int         @default(3)
+  isActive      Boolean     @default(true)
+  isPopular     Boolean     @default(false)
+  sortOrder     Int         @default(0)
+
+  subscriptions Subscription[]
+
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+}
+
+model Subscription {
+  id            String             @id @default(auto()) @map("_id") @db.ObjectId
+  userId        String             @db.ObjectId
+  user          User               @relation(fields: [userId], references: [id])
+  planId        String             @db.ObjectId
+  plan          Plan               @relation(fields: [planId], references: [id])
+  interval      PlanInterval       @default(MONTHLY)
+  status        SubscriptionStatus @default(ACTIVE)
+  currentPeriodStart DateTime
+  currentPeriodEnd   DateTime
+  cancelledAt   DateTime?
+  trialEndsAt   DateTime?
+
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@index([userId])
+  @@index([planId])
+  @@index([status])
+}
+
+model User {
+  id            String    @id @default(auto()) @map("_id") @db.ObjectId
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  password      String?
+  telegramId    String?
+  role          Role      @default(CUSTOMER)
+  
+  stores        Store[]   @relation("StoreOwners")
+  staffStores   Store[]   @relation("StoreStaff", fields: [staffStoreIds], references: [id])
+  staffStoreIds String[]  @db.ObjectId
+
+  orders        Order[]
+  subscriptions Subscription[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model Store {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  name        String
+  slug        String   @unique
+  logo        String?
+  bakongLink  String?
+  abaMerchantLink String?
+  currency    String   @default("USD")
+  language    String   @default("en")
+  telegramBot String?
+
+  ownerId     String   @db.ObjectId
+  owner       User     @relation("StoreOwners", fields: [ownerId], references: [id])
+
+  staffIds    String[] @db.ObjectId
+  staff       User[]   @relation("StoreStaff", fields: [staffIds], references: [id])
+
+  products    Product[]
+  orders      Order[]
+  customers   Customer[]
+  categories  Category[]
+  brands      Brand[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([ownerId])
+}
+
+model Product {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  storeId     String   @db.ObjectId
+  store       Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  
+  name        String
+  description String?
+  sku         String?
+  barcode     String?
+  costPrice   Float
+  sellPrice   Float
+  stockQty    Int      @default(0)
+  status      String   @default("ACTIVE")
+  images      String[]
+
+  categoryId  String?  @db.ObjectId
+  category    Category? @relation(fields: [categoryId], references: [id])
+  
+  brandId     String?  @db.ObjectId
+  brand       Brand?   @relation(fields: [brandId], references: [id])
+
+  variants    Variant[]
+  orderItems  OrderItem[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([storeId])
+  @@index([sku])
+  @@index([categoryId])
+}
+
+model Category {
+  id        String    @id @default(auto()) @map("_id") @db.ObjectId
+  name      String
+  storeId   String    @db.ObjectId
+  store     Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  products  Product[]
+
+  @@index([storeId])
+}
+
+model Brand {
+  id        String    @id @default(auto()) @map("_id") @db.ObjectId
+  name      String
+  storeId   String    @db.ObjectId
+  store     Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  products  Product[]
+
+  @@index([storeId])
+}
+
+model Variant {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  productId   String   @db.ObjectId
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  name        String
+  value       String
+  additionalPrice Float @default(0)
+  stockQty    Int      @default(0)
+
+  @@index([productId])
+}
+
+model Customer {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  storeId   String   @db.ObjectId
+  store     Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  name      String
+  email     String?
+  phone     String?
+  notes     String?
+  orders    Order[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([storeId])
+}
+
+model Order {
+  id            String      @id @default(auto()) @map("_id") @db.ObjectId
+  storeId       String      @db.ObjectId
+  store         Store       @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  
+  customerId    String?     @db.ObjectId
+  customer      Customer?   @relation(fields: [customerId], references: [id])
+  
+  userId        String?     @db.ObjectId
+  user          User?       @relation(fields: [userId], references: [id])
+
+  status        OrderStatus @default(PENDING)
+  totalAmount   Float
+  
+  items         OrderItem[]
+  invoice       Invoice?
+  payment       Payment?
+
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@index([storeId])
+  @@index([customerId])
+  @@index([status])
+}
+
+model OrderItem {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  orderId   String   @db.ObjectId
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  
+  productId String   @db.ObjectId
+  product   Product  @relation(fields: [productId], references: [id])
+  
+  quantity  Int
+  price     Float
+
+  @@index([orderId])
+  @@index([productId])
+}
+
+model Invoice {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  orderId       String   @unique @db.ObjectId
+  order         Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  
+  invoiceNumber String   @unique
+  pdfUrl        String?
+  
+  createdAt     DateTime @default(now())
+}
+
+model Payment {
+  id            String        @id @default(auto()) @map("_id") @db.ObjectId
+  orderId       String        @unique @db.ObjectId
+  order         Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  
+  amount        Float
+  method        String        
+  status        PaymentStatus @default(PENDING)
+  transactionId String?
+
+  createdAt     DateTime      @default(now())
+}
