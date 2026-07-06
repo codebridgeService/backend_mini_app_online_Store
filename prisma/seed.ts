@@ -12,26 +12,69 @@ async function main() {
     where: { email: 'codebridge2026@gmail.com' },
     update: {
       password: adminPassword,
-      role: 'SUPER_ADMIN',
+      role: 'ADMIN',
     },
     create: {
       id: '6a27c836a4e531633dd2dfe3',
       email: 'codebridge2026@gmail.com',
-      name: 'CodeBridge Super Admin',
+      name: 'CodeBridge Admin',
       password: adminPassword,
-      role: 'SUPER_ADMIN',
+      role: 'ADMIN',
     },
   })
 
-  // Create Store Owner
+  // Create Store Owner / Seller
   const owner = await prisma.user.upsert({
     where: { email: 'owner@store.com' },
-    update: {},
+    update: {
+      role: 'SELLER',
+    },
     create: {
       email: 'owner@store.com',
       name: 'Demo Owner',
       password: hashedPassword,
-      role: 'STORE_OWNER',
+      role: 'SELLER',
+    },
+  })
+
+  // Seed B2B Wholesale Price Tier
+  const goldTier = await (prisma as any).priceTier.upsert({
+    where: { id: '6a0000000000000000000001' },
+    update: {},
+    create: {
+      id: '6a0000000000000000000001',
+      name: 'Gold Wholesale Tier',
+      discountPercentage: 20,
+      minOrderAmount: 500,
+    },
+  })
+
+  // Create B2B Buyer (USER)
+  const buyer = await prisma.user.upsert({
+    where: { email: 'buyer@company.com' },
+    update: {
+      role: 'USER',
+    },
+    create: {
+      email: 'buyer@company.com',
+      name: 'B2B Demo Buyer',
+      password: hashedPassword,
+      role: 'USER',
+    },
+  })
+
+  // Create B2B Profile for buyer
+  await (prisma as any).b2BBuyerProfile.upsert({
+    where: { userId: buyer.id },
+    update: {},
+    create: {
+      userId: buyer.id,
+      companyName: 'Global Wholesale Supplies Ltd.',
+      taxId: 'US-TIN-88992211',
+      status: 'APPROVED',
+      creditLimit: 10000,
+      currentBalance: 0,
+      priceTierId: goldTier.id,
     },
   })
 
@@ -64,7 +107,9 @@ async function main() {
       sku: 'WE-001',
       costPrice: 20,
       sellPrice: 50,
-      stockQty: 100,
+      stockQty: 500,
+      moq: 10,
+      casePackQty: 24,
       storeId: store.id,
       categoryId: category.id,
     },

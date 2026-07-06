@@ -2,10 +2,10 @@ import { Request, Response, NextFunction } from "express"
 import { db } from "../lib/prisma"
 import { AuthRequest } from "../middleware/auth.middleware"
 
-// Middleware helper to ensure SUPER_ADMIN
+// Middleware helper to ensure ADMIN
 export function requireSuperAdmin(req: AuthRequest, res: Response, next: NextFunction) {
-  if (req.user?.role !== "SUPER_ADMIN") {
-    return res.status(403).json({ success: false, error: "Forbidden: Super Admin access required" })
+  if (req.user?.role !== "ADMIN" && req.user?.role !== "SUPER_ADMIN") {
+    return res.status(403).json({ success: false, error: "Forbidden: Admin access required" })
   }
   next()
 }

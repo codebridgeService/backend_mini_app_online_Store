@@ -24,7 +24,7 @@ export async function register(req: Request, res: Response, next: NextFunction) 
         email,
         password: hashedPassword,
         name: name || email.split("@")[0],
-        role: role || "STORE_OWNER",
+        role: role || "USER",
       },
     })
 
@@ -43,10 +43,12 @@ export async function register(req: Request, res: Response, next: NextFunction) 
 
 export async function login(req: Request, res: Response, next: NextFunction) {
   try {
-    const { email, password } = req.body
+    let { email, password } = req.body
     if (!email || !password) {
       return res.status(400).json({ success: false, error: "Email and password are required" })
     }
+    email = String(email).trim()
+    password = String(password).trim()
 
     const user = await db.user.findUnique({ where: { email } })
     if (!user || !user.password) {
